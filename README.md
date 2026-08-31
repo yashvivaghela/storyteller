@@ -1,3 +1,92 @@
+# Bedtime story generator
+ 
+A CLI tool that turns a one-line story request into an age-appropriate (5-10) bedtime
+story, using a category-aware prompting pipeline with an LLM judge that critiques and
+improves the draft before it's shown to the user.
+
+## Setup
+ 
+```bash
+pip install "openai<1.0" python-dotenv
+```
+ 
+Create a `.env` file in the project root:
+ 
+```
+OPENAI_API_KEY=sk-...
+```
+ 
+Then run:
+ 
+```bash
+python main.py
+```
+ 
+You'll be prompted for a story request, then the pipeline runs automatically. Once a
+story is shown, you can type `changes` to request edits, `new` to start a fresh story,
+or `done` to quit.
+
+## Architecture
+ 
+```
+                    User input
+                        |
+                        v
+              +-------------------+
+              | Categorize request|
+              | (1 of 5 categories)|
+              +-------------------+
+                        |
+                        v
+              +-------------------+
+              |  Generate story    |
+              | (category-specific |
+              |   prompt template) |
+              +-------------------+
+                        |
+                        v
+              +-------------------+
+   +--------->|  Judge & revise    |
+   | changes  | (checks quality,   |
+   |          |  revises once max) |
+   |          +-------------------+
+   |                    |
+   |                    v
+   |          +-------------------+
+   |          | Show story to user |
+   |          +-------------------+
+   |                    |
+   |                    v
+   |          +-------------------+
+   +----------|  Ask what's next   |
+              | (changes / new     |
+   new story  |  story / done)     |
+   |          +-------------------+
+   |                    |
+   |                    v done
+   v              +-----------+
+(loop to          |   Done    |
+ Categorize)      +-----------+
+```
+
+### Flow
+ 
+- **Categorize request** — an LLM call picks one of five categories (`friendship`,
+   `adventure`, `silly`, `lesson`, `comforting`, or `general` as a fallback).
+- **Generate story** — a shared base template (age rules, 4-beat arc, length, output
+   format) combined with that category's specific guidance.
+- **Judge & revise** — a second LLM call scores the draft against a rubric
+   (age-appropriateness, arc, engagement, category fit) and returns strict JSON:
+   `{"passed": bool, "feedback": str}`. If it fails, one revision pass is made using
+   that feedback; capped at one to bound cost/latency. If the judge's response isn't
+   valid JSON, the pipeline fails open (treats it as passed) rather than blocking the
+   user.
+- **Ask what's next** — `changes` loops back into `revise_story` with the user's own
+   feedback instead of the judge's; `new` loops back to categorize; `done` exits.
+
+
+
+## Original assignment
 # Hippocratic AI Coding Assignment
 Welcome to the [Hippocratic AI](https://www.hippocraticai.com) coding assignment
 
